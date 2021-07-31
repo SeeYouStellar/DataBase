@@ -1,0 +1,367 @@
+/建数据库/
+use master 
+go 
+create database LixyMIS09
+on
+(
+name = 'LixyMIS09_data',
+filename='d:\database\LixyMIS09_data.mdf',
+size=100mb,
+maxsize=500mb,
+filegrowth=10mb
+)
+log on
+(
+name='LixyMIS09_log',
+filename='d:\database\LixyMIS09_data.ldf',
+size=100mb,
+maxsize=500mb,
+filegrowth=10mb
+)
+
+/major表/
+create table Lixy_major09
+(
+lxy_mno09 char(20) primary key,
+lxy_mname09 char(20) not null
+)
+
+/班级表/
+create table Lixy_class09
+(
+lxy_clno09 char(20) primary key,
+lxy_clname09 char(20) not null,
+lxy_mno09 char(20)  not null,
+constraint FK_mno09 foreign key(lxy_mno09) references Lixy_major09(lxy_mno09)
+)
+
+/教师表/
+create table Lixy_teacher09
+(
+lxy_tno09 char(20) primary key,
+lxy_tname09 char(20) not null,
+lxy_tsex09 char(20) check(lxy_tsex09='男' or lxy_tsex09='女'),
+lxy_tbirth09 date ,
+lxy_ttitle09 char(20) ,
+lxy_ttelephone09 char(20)
+)
+
+/生源地表/
+create table Lixy_location09
+(
+lxy_ltown09 char(20) primary key,  --县
+lxy_lcity09 char(20) not null,     --市
+lxy_lprovince09 char(20) not null, --省
+lxy_lnum09 int check(lxy_lnum09>=0)
+)
+
+/学生表/
+create table Lixy_student09
+(
+lxy_sno09 char(20) primary key,
+lxy_sname09 char(20) not null,
+lxy_ssex09 char(20) ,
+lxy_sbirth09 datetime,
+lxy_ltown09 char(20) not null,
+lxy_clno09 char(20) not null,
+lxy_gotcredit09 int,
+constraint FK_key1 foreign key(lxy_ltown09) references Lixy_location09(lxy_ltown09),
+constraint FK_key2 foreign key(lxy_clno09) references Lixy_class09(lxy_clno09)
+)
+
+/课程表/
+create table Lixy_course09
+(
+lxy_cno09 char(20) primary key,
+lxy_cname09 char(20) not null,
+lxy_cterm09 int check(lxy_cterm09>=1 and lxy_cterm09<=8),
+lxy_ctype09 char(20) check(lxy_ctype09='必修' or lxy_ctype09='选修' or lxy_ctype09='通识'),
+lxy_ccredit09 int check(lxy_ccredit09>0),
+lxy_chour09 int check(lxy_chour09>0),
+lxy_test09 char(20)
+)
+
+/选课表/
+create table Lixy_report09
+(
+lxy_tno09 char(20),
+lxy_cno09 char(20),
+lxy_sno09 char(20),
+lxy_grade09 int check(lxy_grade09>=0),
+primary key(lxy_tno09,lxy_cno09,lxy_sno09),
+constraint FK_key4 foreign key(lxy_tno09) references Lixy_teacher09(lxy_tno09),
+constraint FK_key5 foreign key(lxy_cno09) references Lixy_course09(lxy_cno09),
+constraint FK_key6 foreign key(lxy_sno09) references Lixy_student09(lxy_sno09),
+)
+
+/授课表/
+create table Lixy_teaching09
+(
+lxy_tno09 char(20),
+lxy_cno09 char(20),
+primary key(lxy_tno09,lxy_cno09),
+constraint FK_key7 foreign key(lxy_tno09) references Lixy_teacher09(lxy_tno09),
+constraint FK_key8 foreign key(lxy_cno09) references Lixy_course09(lxy_cno09)
+)
+
+/排课表/
+create table Lixy_rangecourse09
+(
+lxy_clno09 char(20),
+lxy_cno09 char(20),
+lxy_tno09 char(20) not null，
+primary key(lxy_clno09,lxy_cno09),
+constraint FK_key9 foreign key(lxy_clno09) references Lixy_class09(lxy_clno09),
+constraint FK_key10 foreign key(lxy_cno09) references Lixy_course09(lxy_cno09)
+constraint FK_key13 foreign key(lxy_tno09) references Lixy_teacher09(lxy_tno09)
+)
+
+/用户表/
+create table Lixy_controlacc09
+(
+lxy_conacc09 char(20) primary key,
+lxy_passward09 char(20))
+
+
+/触发器1 添加总学分/
+create trigger upd_credit_sub on Lixy_report09
+for update,insert
+as
+update Lixy_student09
+set lxy_gotcredit09=lxy_gotcredit09+isnull((select lxy_ccredit09 from Lixy_course09 a,inserted b
+									where a.lxy_cno09 =(select lxy_cno09 from inserted) and b.lxy_grade09>=60),0) 
+where lxy_sno09=(select lxy_sno09 from inserted)
+/触发器2 减少总学分/
+create trigger upd_credit_sub on Lixy_report09
+for update,delete
+as
+update Lixy_student09
+set lxy_gotcredit09=lxy_gotcredit09-isnull((select lxy_ccredit09 from Lixy_course09 a,inserted b
+									where a.lxy_cno09 =(select lxy_cno09 from inserted) and b.lxy_grade09>=60),0) 
+where lxy_sno09=(select lxy_sno09 from inserted)
+
+/触发器3 添加生源/
+create trigger upd_num on Lixy_student09
+for update,insert
+as
+update Lixy_location09
+set lxy_lnum09=lxy_lnum09+1 
+where lxy_ltown09=(select lxy_ltown09 from inserted)
+
+/触发器4 减少生源/
+create trigger upd_num on Lixy_student09
+for update,insert
+as
+update Lixy_location09
+set lxy_lnum09=lxy_lnum09+1 
+where lxy_ltown09=(select lxy_ltown09 from inserted)
+
+/学生成绩按每学年成绩统计/
+select a.lxy_sno09,lxy_cterm09,lxy_grade09,lxy_cname09
+from Lixy_report09 a,Lixy_course09 b,Lixy_student09 c
+where a.lxy_cno09=b.lxy_cno09 and (lxy_cterm09=3 or lxy_cterm09=4) and a.lxy_sno09=c.lxy_sno09 and lxy_sname09='李鑫宇'
+
+/视图班级排表/
+create view class_course09
+as
+select a.lxy_clno09,lxy_clname09,b.lxy_cno09,lxy_cname09,lxy_cterm09,lxy_ccredit09,lxy_chour09,lxy_test09
+from Lixy_class09 a,Lixy_rangecourse09 b,Lixy_course09 c
+where a.lxy_clno09=b.lxy_clno09 and c.lxy_cno09=b.lxy_cno09
+
+/视图教师任课/
+create view teacher_course09
+as
+select c.lxy_cno09,lxy_cname09,c.lxy_tno09,lxy_tname09
+from Lixy_course09 a,Lixy_teacher09 b,Lixy_teaching09 c
+where c.lxy_cno09=a.lxy_cno09 and c.lxy_tno09=b.lxy_tno09
+
+/视图课程平均分/
+create view avg_grade09
+as
+select lxy_cno09,avg(lxy_grade09) avg_grade 
+from Lixy_report09
+group by lxy_cno09
+
+create view avg_grade2_09
+as
+select a.lxy_cno09,b.lxy_cname09,a.avg_grade
+from avg_grade09 a,Lixy_course09 b
+where a.lxy_cno09=b.lxy_cno09
+
+/视图综合信息/
+create view student_course
+as
+select c.lxy_sno09,lxy_sname09,c.lxy_clno09,lxy_clname09,a.lxy_cno09,lxy_cname09,lxy_ccredit09,e.lxy_tno09,lxy_tname09,b.lxy_grade09
+from Lixy_course09 a,Lixy_report09 b,Lixy_student09 c,Lixy_class09 d,Lixy_teacher09 e
+where a.lxy_cno09=b.lxy_cno09 and b.lxy_sno09=c.lxy_sno09 and c.lxy_clno09=d.lxy_clno09 and b.lxy_tno09=e.lxy_tno09
+
+/视图课程学分绩点/
+
+create view courseGPAstatistics09(学号,姓名,课程编号,课程学分,课程名,课程学分绩点)
+as
+select a.lxy_sno09,lxy_sname09,c.lxy_cno09,lxy_ccredit09,lxy_cname09,(1+(lxy_grade09-60)*0.1)*lxy_ccredit09
+from Lixy_student09 a,Lixy_report09 b,Lixy_course09 c
+where lxy_grade09>=60 and b.lxy_cno09=c.lxy_cno09 and a.lxy_sno09=b.lxy_sno09
+union
+select a.lxy_sno09,lxy_sname09,c.lxy_cno09,lxy_ccredit09,lxy_cname09,0
+from Lixy_student09 a,Lixy_report09 b,Lixy_course09 c
+where lxy_grade09<60 and b.lxy_cno09=c.lxy_cno09 and a.lxy_sno09=b.lxy_sno09
+
+/新增/
+create view Lixy_grade_rank
+(lxy_sno09,lxy_gpagrade09)
+As
+Select DISTINCT
+a.lxy_sno09,(sum (b.lxy_grade09* c.lxy_ccredit09)/sum(c.lxy_ccredit09))/10-5
+From Lixy_student09 a,Lixy_report09 b,Lixy_course09 c
+Where a.lxy_sno09=b.lxy_sno09 and c.lxy_cno09=b.lxy_cno09
+Group by a.lxy_sno09
+
+
+/视图GPA/
+create view gpa09
+as
+select a.学号,sum(a.课程学分绩点)/sum(a.课程学分) GPA
+from courseGPAstatistics09 a
+group by a.学号
+
+
+create view gpa_2_09
+as
+select top(99) b.lxy_sno09,b.lxy_sname09,a.GPA,d.lxy_mno09,d.lxy_mname09,c.lxy_clno09,c.lxy_clname09
+from gpa09 a,Lixy_student09 b ,Lixy_class09 c,Lixy_major09 d
+where a.学号=b.lxy_sno09 and b.lxy_clno09 = c.lxy_clno09 and c.lxy_mno09=d.lxy_mno09
+order by d.lxy_mno09,a.GPA desc
+
+
+
+create view Lixy_grade_rank2
+(grade_rank,lxy_sno09,lxy_sname09,lxy_grade09,lxy_clno09,lxy_clname09,lxy_mno09,lxy_mname09)
+As
+Select DISTINCT
+RANK()OVER (ORDER BY a.lxy_gpagrade09 DESC)AS Rank,d.lxy_sno09,d.lxy_sname09,a.lxy_gpagrade09,b.lxy_clno09,b.lxy_clname09,c.lxy_mno09,c.lxy_mname09
+From Lixy_grade_rank a,Lixy_class09 b,Lixy_major09 c,Lixy_student09 d
+where a.lxy_sno09=d.lxy_sno09 and d.lxy_clno09=b.lxy_clno09 and b.lxy_mno09=c.lxy_mno09
+
+/存储过程1-毕业生删除/
+
+/存储过程2-班级排课/
+create procedure sp_class_course09
+@clno char(20),
+@term int
+as
+select lxy_clno09,lxy_cno09,lxy_cname09 
+from class_course09
+where lxy_clno09=@clno and lxy_cterm09=@term
+
+execute sp_class_course09 @clno='CL03' ,@term=3
+
+/存储过程3-教师任课/
+create procedure sp_teacher_course09
+@tno char(20)
+as
+select lxy_tno09,lxy_cno09,lxy_cname09 
+from teacher_course09
+where lxy_tno09=@tno
+
+execute sp_teacher_course09 @tno='T01'
+
+/存储过程4-教师，学生，成绩/
+create procedure sp_course_teacher_grade09
+@tno char(20),
+@cno char(20)
+as
+select Lixy_report09.lxy_sno09,lxy_sname09,lxy_grade09
+from Lixy_report09,Lixy_student09
+where lxy_cno09=@cno and lxy_tno09=@tno and Lixy_report09.lxy_sno09=Lixy_student09.lxy_sno09
+
+
+/存储过程5-删除教师/
+create procedure sp_hire09
+@tname char(20)
+as
+declare @lxy_tno09 char(20)
+declare cur_row_cursor CURSOR FOR
+select lxy_tno09 from Lixy_teacher09 where lxy_tname09=@tname
+open cur_row_cursor
+fetch cur_row_cursor into @lxy_tno09
+while @@fetch_status=0
+begin
+delete from Lixy_report09 where lxy_tno09=@lxy_tno09
+delete from Lixy_teaching09 where lxy_tno09=@lxy_tno09
+delete from Lixy_teacher09 where lxy_tno09=@lxy_tno09
+close cur_row_cursor
+open cur_row_cursor
+fetch cur_row_cursor into @lxy_tno09
+end
+
+
+
+/存储过程6返回专业排名/
+create procedure Lixy_stu_major_rank
+@Sno char(20),
+@majorrank int output
+AS
+  set @majorrank=1
+  declare @rankk int
+  set @rankk=1
+  declare @no char(20)
+  declare cur_row_cursor cursor for
+  select lxy_sno09 from Lixy_grade_rank2 where Lixy_grade_rank2.lxy_mno09=(
+                       select b.lxy_mno09 from Lixy_student09 a,Lixy_class09 b 
+                       where a.lxy_clno09=b.lxy_clno09 and @Sno=lxy_sno09)  
+                        order by grade_rank
+  
+  open cur_row_cursor
+  fetch cur_row_cursor into @no
+  while @@FETCH_STATUS=0
+begin
+  if @Sno=@no begin
+    set @majorrank=@rankk
+    end
+  
+  else begin
+    set @rankk=@rankk+1
+	end
+  fetch cur_row_cursor into @no
+end
+close cur_row_cursor
+deallocate cur_row_cursor
+
+declare @Sno char(20),@majorrank int
+set @Sno='S01'
+exec Lixy_stu_major_rank @Sno,@majorrank  output
+print @majorrank
+
+
+
+/存储过程7返回班级排名/
+
+create procedure Lixy_stu_class_rank
+@Sno char(20),
+@classrank int output
+AS
+  set @classrank=1
+  declare @rankk int
+  set @rankk=1
+  declare @no char(20)
+  declare cur_row_cursor cursor for
+  select lxy_sno09 from Lixy_grade_rank2 where Lixy_grade_rank2.lxy_clno09=(
+                       select lxy_clno09 from Lixy_student09 where @Sno=lxy_sno09)  
+                     order by grade_rank
+  open cur_row_cursor
+  fetch cur_row_cursor into @no
+  while @@FETCH_STATUS=0
+begin
+  if @Sno=@no begin//当学号相同时输出排名
+    set @classrank=@rankk
+    end
+  
+  else begin
+    set @rankk=@rankk+1   //自加1
+	end
+  fetch cur_row_cursor into @no
+end
+close cur_row_cursor
+deallocate cur_row_cursor
+

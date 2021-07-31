@@ -1,0 +1,18 @@
+/存储过程5-删除教师/
+create procedure sp_hire09
+@tname char(20)
+as
+declare @lxy_tno09 char(20)
+declare cur_row_cursor CURSOR FOR
+select lxy_tno09 from Lixy_teacher09 where lxy_tname09=@tname
+open cur_row_cursor
+fetch cur_row_cursor into @lxy_tno09
+while @@fetch_status=0
+begin
+delete from Lixy_report09 where lxy_tno09=@lxy_tno09
+delete from Lixy_teaching09 where lxy_tno09=@lxy_tno09
+delete from Lixy_teacher09 where lxy_tno09=@lxy_tno09
+close cur_row_cursor
+open cur_row_cursor
+fetch cur_row_cursor into @lxy_tno09
+end
